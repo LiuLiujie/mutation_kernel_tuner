@@ -40,7 +40,7 @@ class Mutant:
     
     def updateResult(self, status: MutantStatus, killed_by_id: int = None):
         self.status = status
-        if killed_by_id:
+        if killed_by_id is not None:
             self.killedBy.append(killed_by_id)
             self.coveredBy.append(killed_by_id)
 
@@ -50,8 +50,8 @@ class Mutant:
             "opertorName": self.operator.name,
             "replacement": self.operator.replacement,
             "status": self.status.value,
-            "killedBy": self.killedBy,
-            "coveredKy": self.coveredBy,
+            "killedById": self.killedBy,
+            "coveredById": self.coveredBy,
             "location":{
                 "start": self.start.toJSON(),
                 "end": self.end.toJSON()
