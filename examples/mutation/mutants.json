@@ -1,0 +1,38 @@
+[
+    {
+        "id": 0,
+        "opertorName": "math_replacement",
+        "replacement": "-",
+        "status": "Created",
+        "killedBy": [],
+        "coveredKy": [],
+        "location": {
+            "start": {
+                "line": 3,
+                "column": 41
+            },
+            "end": {
+                "line": 3,
+                "column": 42
+            }
+        }
+    },
+    {
+        "id": 1,
+        "opertorName": "math_replacement",
+        "replacement": "-",
+        "status": "Created",
+        "killedBy": [],
+        "coveredKy": [],
+        "location": {
+            "start": {
+                "line": 5,
+                "column": 25
+            },
+            "end": {
+                "line": 5,
+                "column": 26
+            }
+        }
+    }
+]
