@@ -24,10 +24,11 @@ objective_default_map = {
 def get_objective_defaults(objective, objective_higher_is_better):
     """ Uses time as default objective and attempts to lookup objective_higher_is_better for known objectives """
     objective = objective or "time"
-    if objective_higher_is_better is None and objective in objective_default_map:
-        objective_higher_is_better = objective_default_map[objective]
-    else:
-        raise ValueError(f"Please specify objective_higher_is_better for objective {objective}")
+    if objective_higher_is_better is None:
+        if objective in objective_default_map:
+            objective_higher_is_better = objective_default_map[objective]
+        else:
+            raise ValueError(f"Please specify objective_higher_is_better for objective {objective}")
     return objective, objective_higher_is_better
 
 schema_v1_0 = {
@@ -120,6 +121,79 @@ class TuneResults():
         return _select_best_common_config(self.data, self.objective, self.objective_higher_is_better)
 
 
+def create_results(kernel_name, kernel_string, tune_params, problem_size, results, env, top=3, objective=None, objective_higher_is_better=None, meta=None, data=None):
+    
+    objective, objective_higher_is_better = get_objective_defaults(objective, objective_higher_is_better)
+
+    #filter results to only those that contain the objective
+    results_filtered = [item for item in results if objective in item]
+
+    #get top results
+    if objective_higher_is_better:
+        best_config = max(results_filtered, key=lambda x: x[objective])
+    else:
+        best_config = min(results_filtered, key=lambda x: x[objective])
+    best = best_config[objective]
+    top_range = top/100.0
+
+    def top_result(item):
+        current = item[objective]
+        if objective_higher_is_better:
+            return current > best * (1-top_range)
+        return current < best * (1+top_range)
+    top_results = [item for item in results_filtered if top_result(item)]
+
+    #filter result items to just the tunable parameters and the objective
+    filter_keys = list(tune_params.keys()) + [objective]
+    top_results = [{k:item[k] for k in filter_keys} for item in top_results]
+
+    def validate_meta_and_data(meta, data) -> bool:
+        if not kernel_name == meta["kernel_name"]:
+            raise ValueError("Mismatch between given kernel_name and results file")
+        if not all([param in meta["tunable_parameters"] for param in tune_params]):
+            raise ValueError("Mismatch between tunable_parameters in results file and tune_params")
+        if not objective == meta["objective"]:
+            raise ValueError("Mismatch between given objective and results file")
+        return True
+    
+    if not (meta and data and validate_meta_and_data(meta, data)):
+        #new file
+        meta = {}
+        meta["version_number"] = "1.0"
+        meta["kernel_name"] = kernel_name
+        if kernel_string and not callable(kernel_string) and not isinstance(kernel_string, list):
+            if util.looks_like_a_filename(kernel_string):
+                meta["kernel_string"] = util.read_file(kernel_string)
+            else:
+                meta["kernel_string"] = kernel_string
+        meta["objective"] = objective
+        meta["objective_higher_is_better"] = objective_higher_is_better
+        meta["tunable_parameters"] = list(tune_params.keys())
+        data = []
+    
+    #insert new results into the list
+    if not isinstance(problem_size, (list, tuple)):
+        problem_size = (problem_size,)
+    problem_size_str = "x".join(str(i) for i in problem_size)
+
+    #replace all non alphanumeric characters with underscore
+    dev_name = re.sub('[^0-9a-zA-Z]+', '_', env["device_name"].strip())
+
+    #remove existing entries for this GPU and problem_size combination from the results if any
+    data = [d for d in data if not (d["device_name"] == dev_name and d["problem_size"] == problem_size_str)]
+
+    #extend the results with the top_results
+    results = []
+    for result in top_results:
+        record = {"device_name": dev_name, "problem_size": problem_size_str, "tunable_parameters": {}}
+        for k, v in result.items():
+            if k in tune_params:
+                record["tunable_parameters"][k] = v
+        record[objective] = result[objective]
+        results.append(record)
+    data.extend(results)
+    return meta, data
+
 def store_results(results_filename, kernel_name, kernel_string, tune_params, problem_size, results, env, top=3, objective=None, objective_higher_is_better=None):
     """ stores tuning results to a JSON file
 
@@ -163,78 +237,16 @@ def store_results(results_filename, kernel_name, kernel_string, tune_params, pro
 
     """
 
-    objective, objective_higher_is_better = get_objective_defaults(objective, objective_higher_is_better)
-
-    #filter results to only those that contain the objective
-    results_filtered = [item for item in results if objective in item]
-
-    #get top results
-    if objective_higher_is_better:
-        best_config = max(results_filtered, key=lambda x: x[objective])
-    else:
-        best_config = min(results_filtered, key=lambda x: x[objective])
-    best = best_config[objective]
-    top_range = top/100.0
-
-    def top_result(item):
-        current = item[objective]
-        if objective_higher_is_better:
-            return current > best * (1-top_range)
-        return current < best * (1+top_range)
-    top_results = [item for item in results_filtered if top_result(item)]
-
-    #filter result items to just the tunable parameters and the objective
-    filter_keys = list(tune_params.keys()) + [objective]
-    top_results = [{k:item[k] for k in filter_keys} for item in top_results]
-
     #read existing results file
     if os.path.isfile(results_filename):
         meta, data = _read_results_file(results_filename)
 
-        #validate consistency between arguments and results file
-        if not kernel_name == meta["kernel_name"]:
-            raise ValueError("Mismatch between given kernel_name and results file")
-        if not all([param in meta["tunable_parameters"] for param in tune_params]):
-            raise ValueError("Mismatch between tunable_parameters in results file and tune_params")
-        if not objective == meta["objective"]:
-            raise ValueError("Mismatch between given objective and results file")
+        meta, data = create_results(kernel_name, kernel_string, tune_params, problem_size,
+                               results, env, top, objective, objective_higher_is_better, meta, data)
     else:
-        #new file
-        meta = {}
-        meta["version_number"] = "1.0"
-        meta["kernel_name"] = kernel_name
-        if kernel_string and not callable(kernel_string) and not isinstance(kernel_string, list):
-            if util.looks_like_a_filename(kernel_string):
-                meta["kernel_string"] = util.read_file(kernel_string)
-            else:
-                meta["kernel_string"] = kernel_string
-        meta["objective"] = objective
-        meta["objective_higher_is_better"] = objective_higher_is_better
-        meta["tunable_parameters"] = list(tune_params.keys())
-        data = []
-
-    #insert new results into the list
-    if not isinstance(problem_size, (list, tuple)):
-        problem_size = (problem_size,)
-    problem_size_str = "x".join(str(i) for i in problem_size)
-
-    #replace all non alphanumeric characters with underscore
-    dev_name = re.sub('[^0-9a-zA-Z]+', '_', env["device_name"].strip())
-
-    #remove existing entries for this GPU and problem_size combination from the results if any
-    data = [d for d in data if not (d["device_name"] == dev_name and d["problem_size"] == problem_size_str)]
-
-    #extend the results with the top_results
-    results = []
-    for result in top_results:
-        record = {"device_name": dev_name, "problem_size": problem_size_str, "tunable_parameters": {}}
-        for k, v in result.items():
-            if k in tune_params:
-                record["tunable_parameters"][k] = v
-        record[objective] = result[objective]
-        results.append(record)
-    data.extend(results)
-
+        meta, data = create_results(kernel_name, kernel_string, tune_params, problem_size,
+                               results, env, top, objective, objective_higher_is_better)
+    
     #write output file
     meta["data"] = data
     with open(results_filename, 'w') as fh:
