@@ -23,16 +23,25 @@ class MutationAnalyzer:
         string_lines = kernel_string.splitlines()
 
         for operator in operators:
-            for ridx, line in enumerate(string_lines):
-                columns = [substr.start() for substr in re.finditer(re.escape(operator.old), line)]
-                for cidx in columns:
-                    row = ridx + 1
-                    column = cidx + 1
-                    start = MutantPosition(row, column)
-                    end = MutantPosition(row, column + len(operator.old))
-                    mutants.append(Mutant(current_id, operator, start, end))
-                    current_id+=1
+            if callable(operator.find):
+                new_mutants, current_id = operator.find(string_lines, operator, current_id)
+            else:
+                new_mutants, current_id = self.__re_analyzer(string_lines, operator, current_id)
+            mutants += new_mutants
         return mutants
+    
+    def __re_analyzer(self, string_lines, operator, current_id):
+        mutants = []
+        for ridx, line in enumerate(string_lines):
+            columns = [substr.start() for substr in re.finditer(operator.find, line)]
+            for cidx in columns:
+                row = ridx + 1
+                column = cidx + 1
+                start = MutantPosition(row, column)
+                end = MutantPosition(row, column + len(operator.find))
+                mutants.append(Mutant(current_id, operator, start, end))
+                current_id+=1
+        return mutants, current_id
 
 
 
