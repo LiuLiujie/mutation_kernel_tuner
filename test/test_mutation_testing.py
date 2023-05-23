@@ -39,7 +39,7 @@ def test_analyzer_analyze(test_kernel, backend):
     assert len(mutants) == 2
     list = [mutant.toJSON() for mutant in mutants]
     js= json.dumps(list)
-    with open("demo/mutants.json", "w") as fo:
+    with open("examples/mutation/mutants.json", "w") as fo:
         fo.write(js)
 
 @pytest.mark.parametrize("backend", backends)
@@ -55,7 +55,7 @@ def test_exectutor_mutate(test_kernel, backend):
     for mutant in mutants:
         mutated_kernel_string = MutationExecutor.mutate(kernel_string, mutant.start, mutant.end, mutant.operator.replacement)
         string_list.append(mutated_kernel_string)
-    with open("demo/mutated_kernel.txt", "w") as fo:
+    with open("examples/mutation/mutated_demo_kernel.txt", "w") as fo:
         fo.write("\n".join(string_list))
 
 @pytest.mark.parametrize("backend", backends)
@@ -74,5 +74,5 @@ def test_executor_execute(test_kernel, backend):
     executor = MutationExecutor(builder, mutants, [test_case])
     mutation_result = executor.execute()
     js = mutation_result.exportJSONStr()
-    with open("demo/mutated_result.json", "w") as fo:
+    with open("examples/mutation/mutation_testing_result.json", "w") as fo:
         fo.write(js)
