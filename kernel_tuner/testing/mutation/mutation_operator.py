@@ -78,8 +78,8 @@ math_assignment_replacement_shortcut = [
 ]
 
 negate_conditional_replacement = [
-    MutationOperator('negate_conditional_replacement', "<", ">="), # TODO: in << will cause conpile error
-    MutationOperator('negate_conditional_replacement', ">", "<="), # TODO: in >> will cause conpile error
+    MutationOperator('negate_conditional_replacement', "<", ">=", ignores=["<<","<<<"]),
+    MutationOperator('negate_conditional_replacement', ">", "<=", ignores=[">>",">>>"]),
     MutationOperator('negate_conditional_replacement', "<=", ">"),
     MutationOperator('negate_conditional_replacement', ">=", ">"),
     MutationOperator('negate_conditional_replacement', "==", "!="),
