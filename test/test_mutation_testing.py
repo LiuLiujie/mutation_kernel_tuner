@@ -11,7 +11,7 @@ from kernel_tuner.testing.test_case import TestCase
 from test.context import skip_backend
 backends = ["cuda", "cupy"]
 
-operators = [MutationOperator('math_replacement', "+", "-")]
+operators = [MutationOperator('math_replacement', "+", "-", ignores=["++", "+="])]
 
 @pytest.fixture()
 def test_kernel():

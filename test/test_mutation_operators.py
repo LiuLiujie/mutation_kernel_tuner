@@ -71,27 +71,6 @@ def test_math_replacement(test_kernel, backend):
     assert len(mutants) == 6 # Include 3 compilation errors for '*' in parameter list
 
 @pytest.mark.parametrize("backend", backends)
-def test_distinguish_plus_pp_peq(test_kernel, backend):
-    skip_backend(backend)
-    kernel_name, kernel_string, n, args, expected_output, params = test_kernel
-
-    kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
-    operators_plus = [MutationOperator('math_replacement', r"\+(?![\+\=\r\n\;])", "-")]
-    analyzer = MutationAnalyzer(kernel_source, operators_plus)
-    mutants = analyzer.analyze()
-    assert len(mutants) == 2
-
-    operators_pp = [MutationOperator('arithmetic_operator_replacement_shortcut', r"\+\+", "--")]
-    analyzer = MutationAnalyzer(kernel_source, operators_pp)
-    mutants = analyzer.analyze()
-    assert len(mutants) == 1
-
-    operators_ = [MutationOperator('shortcut_assignment_operator_replacement', r"\+\=", "-="),]
-    analyzer = MutationAnalyzer(kernel_source, operators_pp)
-    mutants = analyzer.analyze()
-    assert len(mutants) == 1
-
-@pytest.mark.parametrize("backend", backends)
 def test_math_assignment_replacement_shortcut(test_kernel, backend):
     skip_backend(backend)
     kernel_name, kernel_string, n, args, expected_output, params = test_kernel

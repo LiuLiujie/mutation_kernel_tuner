@@ -37,10 +37,10 @@ class MutationAnalyzer:
             ignore_columns = []
             if operator.ignores:
                 for ignore in operator.ignores:
-                    for substr in re.finditer(ignore, line):
+                    for substr in re.finditer(re.escape(ignore), line):
                         ignore_columns += list(range(substr.start(), substr.end()))
             
-            columns = [substr.start() for substr in re.finditer(operator.find, line) if substr.start() not in ignore_columns]
+            columns = [substr.start() for substr in re.finditer(re.escape(operator.find), line) if substr.start() not in ignore_columns]
             for cidx in columns:
                 row = ridx + 1
                 column = cidx + 1

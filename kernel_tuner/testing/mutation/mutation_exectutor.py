@@ -18,7 +18,11 @@ class MutationExecutor():
 
             #Mutate the kenel code
             mutated_kernel_string = MutationExecutor.mutate(original_kernel_string, mutant.start, mutant.end, mutant.operator.replacement)
-            kernel.update_kernel(mutated_kernel_string)
+            try:
+                kernel.update_kernel(mutated_kernel_string)
+            except Exception:
+                mutant.updateResult(MutantStatus.COMPILE_ERROR)
+                continue
 
             for test_case in self.test_cases:
                 kernel.update_gpu_args(test_case.input)

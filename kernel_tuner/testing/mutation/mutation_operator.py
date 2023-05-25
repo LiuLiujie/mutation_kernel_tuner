@@ -3,7 +3,7 @@ ppc = pp.pyparsing_common
 
 class MutationOperator():
 
-    def __init__(self, name: str, find: str or function,replacement: str, ignores: list[str] = None, backends: list[str] = None,tags: list[str] = []):
+    def __init__(self, name: str, find: str or function, replacement: str, ignores: list[str] = None, backends: list[str] = None,tags: list[str] = []):
         self.name = name
         self.find = find
         self.ignores = ignores
@@ -40,41 +40,41 @@ def loadAllGPUNativeOperators(name: str = None, tags: list[str] = []) -> list[Mu
             + sync_child_removal
 
 conditional_boundary_replacement = [
-    MutationOperator('conditional_boundary_replacement', "\<(?![=])", "<="),
+    MutationOperator('conditional_boundary_replacement', "<", "<=", ignores=["<="]),
     MutationOperator('conditional_boundary_replacement', "<=", "<"),
-    MutationOperator('conditional_boundary_replacement', "\>(?![=])", ">="),
+    MutationOperator('conditional_boundary_replacement', ">", ">=", ignores=[">="]),
     MutationOperator('conditional_boundary_replacement', ">=", ">")
 ]
 
 arithmetic_operator_replacement_shortcut = [
-    MutationOperator('arithmetic_operator_replacement_shortcut', "\+\+", "--"),
+    MutationOperator('arithmetic_operator_replacement_shortcut', "++", "--"),
     MutationOperator('arithmetic_operator_replacement_shortcut', "--", "++")
 ]
 
 conditional_operator_replacement = [
     MutationOperator('conditional_operator_replacement', "&&", "||"),
-    MutationOperator('conditional_operator_replacement', "\|\|", "&&")
+    MutationOperator('conditional_operator_replacement', "||", "&&")
 ]
 
 math_replacement_operators = [
-    MutationOperator('math_replacement', "\+(?![\+\=\r\n\;])", "-"),
-    MutationOperator('math_replacement', "\-(?![\-\=\r\n\;])", "+"),
-    MutationOperator('math_replacement', "\*(?![\=])", "/"),
-    MutationOperator('math_replacement', "\/(?![\=])", "*"),
-    MutationOperator('math_replacement', "\%(?![\=])", "*"),
-    MutationOperator('math_replacement', "\&(?![\=])", "|", ignores=["&&"]),
-    MutationOperator('math_replacement', "\|(?![\=])", "&", ignores=["||"]),
-    MutationOperator('math_replacement', "\^(?![\=])", "&"),
-    MutationOperator('math_replacement', "\<\<", ">>", ignores=["<<<"]),
-    MutationOperator('math_replacement', "\>\>", "<<", ignores=[">>>"])
+    MutationOperator('math_replacement', "+", "-", ignores=["++", "+="]),
+    MutationOperator('math_replacement', "-", "+", ignores=["--", "-="]),
+    MutationOperator('math_replacement', "*", "/", ignores=["*="]),
+    MutationOperator('math_replacement', "/", "*", ignores=["/="]),
+    MutationOperator('math_replacement', "%", "*", ignores=["&="]),
+    MutationOperator('math_replacement', "&", "|", ignores=["&&"]),
+    MutationOperator('math_replacement', "|", "&", ignores=["||", "|="]),
+    MutationOperator('math_replacement', "^", "&", ignores=["^="]),
+    MutationOperator('math_replacement', "<<", ">>", ignores=["<<<"]),
+    MutationOperator('math_replacement', ">>", "<<", ignores=[">>>"])
 ]
 
 math_assignment_replacement_shortcut = [
-    MutationOperator('math_assignment_replacement_shortcut', "\+\=", "-="), # += -> -=
-    MutationOperator('math_assignment_replacement_shortcut', "\-\=", "+="), # -= -> +=
-    MutationOperator('math_assignment_replacement_shortcut', "\*\=", "/="), # *= -> /=
-    MutationOperator('math_assignment_replacement_shortcut', "\/\=", "*="), # /= -> *=
-    MutationOperator('math_assignment_replacement_shortcut', "\%\=", "*=")  # %= -> *=
+    MutationOperator('math_assignment_replacement_shortcut', "+=", "-="),
+    MutationOperator('math_assignment_replacement_shortcut', "-=", "+="),
+    MutationOperator('math_assignment_replacement_shortcut', "*=", "/="),
+    MutationOperator('math_assignment_replacement_shortcut', "/=", "*="),
+    MutationOperator('math_assignment_replacement_shortcut', "%=", "*=") 
 ]
 
 negate_conditional_replacement = [
@@ -95,7 +95,7 @@ arithmetic_operator_insertion = [
 ]
 
 conditional_operator_deletion = [
-    MutationOperator('conditional_operator_deletion', "\!(?![\=])", "")
+    MutationOperator('conditional_operator_deletion', "!", "", ignores=["!="])
 ]
 
 arithmetic_operator_deletion = [
@@ -147,18 +147,18 @@ atom_removal = [
 ]
 
 gpu_index_replacement = [
-    MutationOperator('gpu_index_replacement', "blockIdx\.x", "threadIdx.x"),
-    MutationOperator('gpu_index_replacement', "threadIdx\.x;", "blockIdx.x;")
+    MutationOperator('gpu_index_replacement', "blockIdx.x", "threadIdx.x"),
+    MutationOperator('gpu_index_replacement', "threadIdx.x;", "blockIdx.x;")
 ]
 
 gpu_index_increment = [
-    MutationOperator('gpu_index_increment', "blockIdx\.x", "(blockIdx.x + 1)"),
-    MutationOperator('gpu_index_increment', "threadIdx\.x", "(threadIdx.x + 1)")
+    MutationOperator('gpu_index_increment', "blockIdx.x", "(blockIdx.x + 1)"),
+    MutationOperator('gpu_index_increment', "threadIdx.x", "(threadIdx.x + 1)")
 ]
 
 gpu_index_decrement = [
-    MutationOperator('gpu_index_decrement', "blockIdx\.x", "(blockIdx.x - 1)"),
-    MutationOperator('gpu_index_decrement', "threadIdx\.x", "(threadIdx.x - 1)")
+    MutationOperator('gpu_index_decrement', "blockIdx.x", "(blockIdx.x - 1)"),
+    MutationOperator('gpu_index_decrement', "threadIdx.x", "(threadIdx.x - 1)")
 ]
 
 sync_removal = [
