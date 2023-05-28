@@ -1,8 +1,10 @@
+import itertools
 import numpy as np
 import pytest
 import json
 
 from kernel_tuner import core
+from kernel_tuner.testing.mutation.mutant import HigherOrderMutant, MutantStatus
 from kernel_tuner.testing.mutation.mutation_analyzer import MutationAnalyzer
 from kernel_tuner.testing.mutation.mutation_exectutor import MutationExecutor
 from kernel_tuner.testing.testing_kernel import TestingKernelBuilder
@@ -73,6 +75,40 @@ def test_executor_execute(test_kernel, backend):
 
     executor = MutationExecutor(builder, mutants, [test_case])
     mutation_result = executor.execute()
+
+    for mutant in mutation_result.mutants:
+        assert mutant.status == MutantStatus.KILLED
+
     js = mutation_result.exportJSONStr()
     with open("examples/mutation/mutation_testing_result.json", "w") as fo:
+        fo.write(js)
+
+@pytest.mark.parametrize("backend", backends)
+def test_ho_executor_execute(test_kernel, backend):
+    skip_backend(backend)
+    kernel_name, kernel_string, n, args, expected_output, params = test_kernel
+
+    kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
+    analyzer = MutationAnalyzer(kernel_source, operators)
+    mutants = analyzer.analyze()
+
+    builder = TestingKernelBuilder(kernel_name, kernel_string, n, args, expected_output, params)
+
+    test_case = TestCase(0, args, expected_output, n)
+
+    mutation_order = 2
+    comb_mutants_list = itertools.combinations(mutants, mutation_order)
+    ho_mutants = [HigherOrderMutant(comb_mutants, mutation_order) for comb_mutants in comb_mutants_list]
+
+    executor = MutationExecutor(builder, mutants, [test_case], ho_mutants)
+    mutation_result = executor.execute()
+
+    for mutant in mutation_result.mutants:
+        assert mutant.status == MutantStatus.KILLED
+
+    for ho_mutant in mutation_result.higher_order_mutants:
+        assert ho_mutant.status == MutantStatus.KILLED
+
+    js = mutation_result.exportJSONStr()
+    with open("examples/mutation/high_order_mutation_testing_result.json", "w") as fo:
         fo.write(js)

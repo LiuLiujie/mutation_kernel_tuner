@@ -1,6 +1,8 @@
+import itertools
 from kernel_tuner import core, util
 from kernel_tuner.integration import create_results, get_objective_defaults
 from kernel_tuner.interface import run_kernel, tune_kernel
+from kernel_tuner.testing.mutation.mutant import HigherOrderMutant
 from kernel_tuner.testing.mutation.mutation_analyzer import MutationAnalyzer
 from kernel_tuner.testing.mutation.mutation_exectutor import MutationExecutor
 from kernel_tuner.testing.testing_kernel import TestingKernelBuilder
@@ -98,8 +100,8 @@ def mut_kernel(
         kernel_source,
         test_cases,
         test_params,
-        mutation_operator=None,
-        mutation_options=dict,
+        mutation_order = 1,
+        mutation_analyze_only = False,
         grid_div_x=None,
         grid_div_y=None,
         grid_div_z=None,
@@ -176,17 +178,23 @@ def mut_kernel(
 
     analyzer = MutationAnalyzer(kernelsource, operators)
     mutants = analyzer.analyze()
-    if mutation_options["analyze_only"]:
+    if mutation_analyze_only:
         analyze_result = MutationResult(mutants, test_cases)
         analyze_result.add_tune_data_meta(tune_meta, tune_data)
         #TODO: dump file
-    
-    mutation_result = MutationResult(mutants,test_cases)
+
+    # Check if high order mutation testing
+    ho_mutants = []
+    if mutation_order > 1:
+        comb_mutants_list = itertools.combinations(mutants, mutation_order)
+        ho_mutants = [HigherOrderMutant(comb_mutants, mutation_order) for comb_mutants in comb_mutants_list]
+
+    # Execute the mutants and ho_mutants (if any)
     for idx, problem_size in enumerate(problem_size_list):
         test_case_0 = filtered_test_cases[idx][0]
         builder = TestingKernelBuilder(kernel_name, kernel_string, problem_size,
                                                   test_case_0.input, test_case_0.output, best_config_list[idx])
-        executor = MutationExecutor(builder, mutants, filtered_test_cases[idx])
+        executor = MutationExecutor(builder, mutants, filtered_test_cases[idx], ho_mutants)
         executor.execute()
 
-    return mutation_result
+    return MutationResult(mutants, test_cases, ho_mutants)

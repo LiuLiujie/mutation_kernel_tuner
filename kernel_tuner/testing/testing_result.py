@@ -11,9 +11,6 @@ class TestingResult():
         self.tune_data = None
         self.tune_meta = None
 
-    def conbine_result(self, result):
-        self.test_cases.append(result.test_cases)
-
     def add_tune_data_meta(self, meta, data) -> None:
         self.tune_data = data
         self.tune_meta = meta

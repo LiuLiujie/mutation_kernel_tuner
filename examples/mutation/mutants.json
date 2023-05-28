@@ -1,11 +1,11 @@
 [
     {
         "id": 0,
-        "opertorName": "math_replacement",
+        "operatorName": "math_replacement",
         "replacement": "-",
         "status": "Created",
-        "killedBy": [],
-        "coveredKy": [],
+        "killedById": [],
+        "coveredById": [],
         "location": {
             "start": {
                 "line": 3,
@@ -19,11 +19,11 @@
     },
     {
         "id": 1,
-        "opertorName": "math_replacement",
+        "operatorName": "math_replacement",
         "replacement": "-",
         "status": "Created",
-        "killedBy": [],
-        "coveredKy": [],
+        "killedById": [],
+        "coveredById": [],
         "location": {
             "start": {
                 "line": 5,

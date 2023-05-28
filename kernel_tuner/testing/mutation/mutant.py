@@ -3,15 +3,24 @@ from enum import Enum, unique
 
 @unique
 class MutantStatus(Enum):
+    #When created, init state
     CREATED = 'Created'
+
+    #When first run starts
     PENDING = 'Pending'
-    KILLED='killed'
+    
+    #After at least one test, no longer run for following tests
+    KILLED = 'killed'
     PERF_KILLED = 'KilledByPerf'
-    SURVIVED = 'Survived'
-    NO_COVERAGE = 'NoCoverage'
     COMPILE_ERROR = 'CompileError'
-    RUNTIME_ERROR = 'RuntimeError'
-    TIMEOUT = 'Timeout'
+
+    #Intermedia state for a single test run, will change after all tests
+    TIMEOUT = 'Timeout'             # to KILLED
+    RUNTIME_ERROR = 'RuntimeError'  # to KILLED
+    NO_COVERAGE = 'NoCoverage'      # to SURVIVED
+
+    #After all tests
+    SURVIVED = 'Survived'
     IGNORE = 'Ignore'
 
 class MutantPosition:
@@ -47,7 +56,7 @@ class Mutant:
     def toJSON(self) -> dict:
         return {
             "id": self.id,
-            "opertorName": self.operator.name,
+            "operatorName": self.operator.name,
             "replacement": self.operator.replacement,
             "status": self.status.value,
             "killedById": self.killedBy,
@@ -57,3 +66,27 @@ class Mutant:
                 "end": self.end.toJSON()
             }
         }
+
+class HigherOrderMutant:
+    def __init__(self, mutants: list[Mutant], mutation_order: int, status = MutantStatus.CREATED) -> None:
+        self.mutants = mutants
+        self.status = status
+        self.mutation_order = mutation_order
+        self.killedBy = []
+        self.coveredBy = []
+    
+    def updateResult(self, status: MutantStatus, killed_by_id: int = None):
+        self.status = status
+        if killed_by_id is not None:
+            self.killedBy.append(killed_by_id)
+            self.coveredBy.append(killed_by_id)
+    
+    def toJSON(self) -> dict:
+        return {
+            "combined_mutants": [mutant.id for mutant in self.mutants],
+            "mutation_order": self.mutation_order,
+            "status": self.status.value,
+            "killedById": self.killedBy,
+            "coveredById": self.coveredBy,
+        }
+    
