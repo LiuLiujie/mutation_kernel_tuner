@@ -23,6 +23,8 @@ def test_kernel():
             c[i] /= a[i];
         }
         __syncthreads();
+        atomicAdd(&a[i], 1);
+        vector_add<<<1024, 256>>>();
     }
     """
     n = np.int32(100)
@@ -68,7 +70,8 @@ def test_math_replacement(test_kernel, backend):
     kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
     analyzer = MutationAnalyzer(kernel_source, math_replacement_operators)
     mutants = analyzer.analyze()
-    assert len(mutants) == 6 # Include 3 compilation errors for '*' in parameter list
+    # Include 3 compilation errors for '*' in parameter list, and 1 error in getting address
+    assert len(mutants) == 7
 
 @pytest.mark.parametrize("backend", backends)
 def test_math_assignment_replacement_shortcut(test_kernel, backend):
@@ -89,6 +92,46 @@ def test_negate_conditional_replacement(test_kernel, backend):
     analyzer = MutationAnalyzer(kernel_source, negate_conditional_replacement)
     mutants = analyzer.analyze()
     assert len(mutants) == 2
+
+@pytest.mark.parametrize("backend", backends)
+def test_allocation_swap(test_kernel, backend):
+    skip_backend(backend)
+    kernel_name, kernel_string, n, args, expected_output, params = test_kernel
+
+    kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
+    analyzer = MutationAnalyzer(kernel_source, allocation_swap)
+    mutants = analyzer.analyze()
+    assert len(mutants) == 1
+
+@pytest.mark.parametrize("backend", backends)
+def test_allocation_increase(test_kernel, backend):
+    skip_backend(backend)
+    kernel_name, kernel_string, n, args, expected_output, params = test_kernel
+
+    kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
+    analyzer = MutationAnalyzer(kernel_source, allocation_increase)
+    mutants = analyzer.analyze()
+    assert len(mutants) == 2
+
+@pytest.mark.parametrize("backend", backends)
+def test_allocation_decrease(test_kernel, backend):
+    skip_backend(backend)
+    kernel_name, kernel_string, n, args, expected_output, params = test_kernel
+
+    kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
+    analyzer = MutationAnalyzer(kernel_source, allocation_decrease)
+    mutants = analyzer.analyze()
+    assert len(mutants) == 2
+
+@pytest.mark.parametrize("backend", backends)
+def test_atomic_add_sub_removal(test_kernel, backend):
+    skip_backend(backend)
+    kernel_name, kernel_string, n, args, expected_output, params = test_kernel
+
+    kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
+    analyzer = MutationAnalyzer(kernel_source, atom_removal)
+    mutants = analyzer.analyze()
+    assert len(mutants) == 1
 
 @pytest.mark.parametrize("backend", backends)
 def test_gpu_index_replacement(test_kernel, backend):

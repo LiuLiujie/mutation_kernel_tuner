@@ -67,6 +67,7 @@ def test_kernel(
         #Retrieve the first test case for each problem size and tune it
         tune_case = filtered_test_cases[idx][0]
         #TODO: fill out all the parameters
+        #TODO: check test_params is list or not before input
         try:
             tune_results, env = tune_kernel(kernel_name, kernel_source, tune_case.problem_size, tune_case.input, test_params,
                                 answer=tune_case.output, verify=tune_case.verify, atol = tune_case.atol,
@@ -102,6 +103,7 @@ def mut_kernel(
         test_params,
         mutation_order = 1,
         mutation_analyze_only = False,
+        mutation_timeout_second = 30,
         grid_div_x=None,
         grid_div_y=None,
         grid_div_z=None,
@@ -194,7 +196,7 @@ def mut_kernel(
         test_case_0 = filtered_test_cases[idx][0]
         builder = TestingKernelBuilder(kernel_name, kernel_string, problem_size,
                                                   test_case_0.input, test_case_0.output, best_config_list[idx])
-        executor = MutationExecutor(builder, mutants, filtered_test_cases[idx], ho_mutants)
+        executor = MutationExecutor(builder, mutants, filtered_test_cases[idx], ho_mutants, mutation_timeout_second)
         executor.execute()
 
     return MutationResult(mutants, test_cases, ho_mutants)

@@ -1,4 +1,4 @@
-from kernel_tuner.testing.mutation.mutation_operator import MutationOperator
+#from kernel_tuner.testing.mutation.mutation_operator import MutationOperator
 from enum import Enum, unique
 
 @unique
@@ -19,8 +19,10 @@ class MutantStatus(Enum):
     RUNTIME_ERROR = 'RuntimeError'  # to KILLED
     NO_COVERAGE = 'NoCoverage'      # to SURVIVED
 
-    #After all tests
+    #All tests survive
     SURVIVED = 'Survived'
+
+    #Unknown error
     IGNORE = 'Ignore'
 
 class MutantPosition:
@@ -33,8 +35,8 @@ class MutantPosition:
         return {"line":self.line, "column": self.column}
 
 class Mutant:
-    def __init__(self, id: int, operator: MutationOperator,
-                  start: MutantPosition, end: MutantPosition, status = MutantStatus.CREATED):
+    def __init__(self, id: int, operator, start: MutantPosition, end: MutantPosition,
+                  status = MutantStatus.CREATED):
         self.id = id
         self.operator = operator
         self.start = start
@@ -68,7 +70,8 @@ class Mutant:
         }
 
 class HigherOrderMutant:
-    def __init__(self, mutants: list[Mutant], mutation_order: int, status = MutantStatus.CREATED) -> None:
+    def __init__(self, id: str, mutants: list[Mutant], mutation_order: int, status = MutantStatus.CREATED) -> None:
+        self.id = id
         self.mutants = mutants
         self.status = status
         self.mutation_order = mutation_order

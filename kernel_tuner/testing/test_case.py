@@ -87,9 +87,21 @@ def _default_verification_function(result, test_case: TestCase) -> TestCase:
                 else:
                     return test_case.test_fail(f"Element {i} of expected results list and kernel arguments have different types.")
 
-    for i, arg in enumerate(result):
+    def _ravel(a):
+        if hasattr(a, 'ravel') and len(a.shape) > 1:
+            return a.ravel()
+        return a
+
+    def _flatten(a):
+        if hasattr(a, 'flatten'):
+            return a.flatten()
+        return a
+
+    for i, arg in enumerate(test_case.input):
         expected = answer[i]
         if expected is not None:
+            result = _ravel(result[i])
+            expected = _flatten(expected)
             if any([isinstance(array, cp.ndarray) for array in [expected, result]]):
                 output_test = cp.allclose(expected, result, atol=test_case.atol)
             elif isinstance(expected, torch.Tensor) and isinstance(result, torch.Tensor):

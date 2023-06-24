@@ -98,7 +98,9 @@ def test_ho_executor_execute(test_kernel, backend):
 
     mutation_order = 2
     comb_mutants_list = itertools.combinations(mutants, mutation_order)
-    ho_mutants = [HigherOrderMutant(comb_mutants, mutation_order) for comb_mutants in comb_mutants_list]
+    ho_mutants = [HigherOrderMutant(id = "Combi-"+("-".join([str(mutant.id) for mutant in comb_mutants])),
+                                    mutants = comb_mutants,
+                                    mutation_order = mutation_order) for comb_mutants in comb_mutants_list]
 
     executor = MutationExecutor(builder, mutants, [test_case], ho_mutants)
     mutation_result = executor.execute()

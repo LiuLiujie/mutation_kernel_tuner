@@ -57,7 +57,7 @@ class TestingKernel():
             
     def __get_gpu_result(self) -> list:
         results = []
-        for i, _ in enumerate(self.gpu_args):
+        for i, _ in enumerate(self.expected_output):
             if isinstance(self.expected_output[i], np.ndarray):
                 res = np.zeros_like(self.expected_output[i])
                 self.dev_inf.memcpy_dtoh(res, self.gpu_args[i])
@@ -74,7 +74,6 @@ class TestingKernel():
             return False
             
     def execute(self) -> list:
-        #TODO: throw errors to caller to see if the mutant can be comiled or has runtime errors
         self.dev_inf.run_kernel(self.func, self.gpu_args, self.kernel_instance)
         result = self.__get_gpu_result()
         self.__reset_gpu_result()
