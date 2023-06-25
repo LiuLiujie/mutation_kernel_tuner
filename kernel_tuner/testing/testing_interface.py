@@ -103,7 +103,7 @@ def mut_kernel(
         test_params,
         mutation_order = 1,
         mutation_analyze_only = False,
-        mutation_timeout_second = 30,
+        mutation_timeout_second = 10,
         grid_div_x=None,
         grid_div_y=None,
         grid_div_z=None,
@@ -189,7 +189,10 @@ def mut_kernel(
     ho_mutants = []
     if mutation_order > 1:
         comb_mutants_list = itertools.combinations(mutants, mutation_order)
-        ho_mutants = [HigherOrderMutant(comb_mutants, mutation_order) for comb_mutants in comb_mutants_list]
+        ho_mutants = [HigherOrderMutant(
+            id = "Combi-"+("-".join([str(mutant.id) for mutant in comb_mutants])),
+            mutants = comb_mutants,
+            mutant_order = mutation_order) for comb_mutants in comb_mutants_list]
 
     # Execute the mutants and ho_mutants (if any)
     for idx, problem_size in enumerate(problem_size_list):
@@ -197,6 +200,7 @@ def mut_kernel(
         builder = TestingKernelBuilder(kernel_name, kernel_string, problem_size,
                                                   test_case_0.input, test_case_0.output, best_config_list[idx])
         executor = MutationExecutor(builder, mutants, filtered_test_cases[idx], ho_mutants, mutation_timeout_second)
+        print("Start mutation testing using test cases [", [", ".join(str(case.id)) for case in filtered_test_cases[idx]], "], problem size", problem_size)
         executor.execute()
 
     return MutationResult(mutants, test_cases, ho_mutants)
