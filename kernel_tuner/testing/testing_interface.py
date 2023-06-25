@@ -192,7 +192,7 @@ def mut_kernel(
         ho_mutants = [HigherOrderMutant(
             id = "Combi-"+("-".join([str(mutant.id) for mutant in comb_mutants])),
             mutants = comb_mutants,
-            mutant_order = mutation_order) for comb_mutants in comb_mutants_list]
+            mutation_order = mutation_order) for comb_mutants in comb_mutants_list]
 
     # Execute the mutants and ho_mutants (if any)
     for idx, problem_size in enumerate(problem_size_list):
