@@ -196,11 +196,18 @@ class MutationExecutor():
             #Start a new mutant
             if (ho_mutant.status == MutantStatus.CREATED):
                 #If the mutant contains compile error, then the ho_mutant will also have
+                skip_ho_mutant = False
                 for mutant in ho_mutant.mutants:
                     if (mutant.status == MutantStatus.COMPILE_ERROR):
-                        ho_mutant.status == MutantStatus.COMPILE_ERROR
+                        print("Skip high order mutant", ho_mutant.id, "because it contains error or timeout mutant(s)")
+                        skip_ho_mutant = True
+                        break
                 
-                ho_mutant.status = MutantStatus.PENDING
+                if skip_ho_mutant:
+                    ho_mutant.updateResult(MutantStatus.COMPILE_ERROR)
+                    continue
+                else:
+                    ho_mutant.status = MutantStatus.PENDING
 
             mutated_kernel_string = deepcopy(kernel_string)
             #Mutate the kenel code
@@ -254,16 +261,16 @@ class MutationExecutor():
                             ho_mutant.updateResult(MutantStatus.KILLED, test_case.id)
                 
             except CompilationException:
-                print("Mutant", mutant.id, "has compilation error")
-                mutant.updateResult(MutantStatus.COMPILE_ERROR)
+                print("Mutant", ho_mutant.id, "has compilation error")
+                ho_mutant.updateResult(MutantStatus.COMPILE_ERROR)
             except UnknownException:
-                print("Mutant", mutant.id, "has unknown error, ignore the mutant")
-                mutant.updateResult(MutantStatus.IGNORE)
+                print("Mutant", ho_mutant.id, "has unknown error, ignore the mutant")
+                ho_mutant.updateResult(MutantStatus.IGNORE)
             except RuntimeException:
-                print("Mutant", mutant.id, "has runtime error")
-                mutant.updateResult(MutantStatus.RUNTIME_ERROR)
+                print("Mutant", ho_mutant.id, "has runtime error")
+                ho_mutant.updateResult(MutantStatus.RUNTIME_ERROR)
             except TimeoutException:
-                print("Higher Order Mutant", mutant.id, "timeout")
+                print("Higher Order Mutant", ho_mutant.id, "timeout")
                 ho_mutant.status = MutantStatus.TIMEOUT
             else: 
                 # Not killed by any test cases: mutant survived
