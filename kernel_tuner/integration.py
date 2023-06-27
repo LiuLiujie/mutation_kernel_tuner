@@ -126,7 +126,7 @@ def create_results(kernel_name, kernel_string, tune_params, problem_size, result
     objective, objective_higher_is_better = get_objective_defaults(objective, objective_higher_is_better)
 
     #filter results to only those that contain the objective
-    results_filtered = [item for item in results if objective in item]
+    results_filtered = [item for item in results if objective in item and isinstance(item[objective], float)]
 
     #get top results
     if objective_higher_is_better:

@@ -90,15 +90,25 @@ class TestingKernelBuilder():
         self.params = params
 
         # Optional parameters
-        self.verify_method = None
-        self.device=0
-        self.platform=0
-        self.block_size_names=None
         self.grid_div_x=None
         self.grid_div_y=None
         self.grid_div_z=None
+        self.restrictions=None
+        self.device=0
+        self.platform=0
+        self.block_size_names=None
         self.verbose=True
         self.lang=None
+    
+    def add_grid_div(self, grid_div_x=None, grid_div_y=None, grid_div_z=None):
+        self.grid_div_x = grid_div_x
+        self.grid_div_y = grid_div_y
+        self.grid_div_z = grid_div_z
+        return self
+    
+    def add_restriction(self, restrictions):
+        self.restrictions = restrictions
+        return self
 
     def init_by_tune_result(results_file: TuneResults, arguments, expected_output):
         results = TuneResults(results_file)
