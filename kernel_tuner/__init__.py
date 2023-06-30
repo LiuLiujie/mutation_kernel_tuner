@@ -4,4 +4,4 @@ from kernel_tuner.testing.test_case import TestCase
 from kernel_tuner.testing.mutation.mutant import MutantStatus
 from kernel_tuner.testing.testing_interface import test_kernel, mut_kernel
 
-__version__ = "0.4.4"
+__version__ = "0.4.5"
