@@ -1,9 +1,6 @@
-import pyparsing as pp
 import re
 
 from kernel_tuner.testing.mutation.mutant import Mutant, MutantPosition
-
-ppc = pp.pyparsing_common
 
 class MutationOperator():
 
