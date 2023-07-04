@@ -8,7 +8,7 @@ from kernel_tuner.testing.mutation.mutation_exectutor import MutationExecutor
 from kernel_tuner.testing.testing_kernel import TestingKernelBuilder
 from kernel_tuner.testing.mutation.mutation_operator import loadAllOperators
 from kernel_tuner.testing.mutation.mutation_result import MutationResult
-from kernel_tuner.testing.test_case import filter_by_problem_size, verification
+from kernel_tuner.testing.testing_test_case import filter_by_problem_size, verification
 from kernel_tuner.testing.testing_result import TestingResult
 
 def test_kernel(
@@ -201,7 +201,10 @@ def mut_kernel(
     for idx, problem_size in enumerate(problem_size_list):
         test_case_0 = filtered_test_cases[idx][0]
         builder = TestingKernelBuilder(kernel_name, kernel_string, problem_size, 
-                                       test_case_0.input, test_case_0.output, best_config_list[idx]).add_grid_div(grid_div_x, grid_div_y, grid_div_z).add_restriction(restrictions)
+                                       test_case_0.input, test_case_0.output, best_config_list[idx]) \
+                    .add_grid_div(grid_div_x, grid_div_y, grid_div_z) \
+                    .add_restriction(restrictions) \
+                    .enable_testing_timeout(mutation_timeout_second)
         executor = MutationExecutor(builder, mutants, filtered_test_cases[idx], ho_mutants, mutation_timeout_second)
         print("Start mutation testing using test cases [", [", ".join(str(case.id)) for case in filtered_test_cases[idx]], "], problem size", problem_size)
         executor.execute()

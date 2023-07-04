@@ -1,7 +1,7 @@
 import json
 
 from kernel_tuner.util import NpEncoder
-from kernel_tuner.testing.test_case import TestCase
+from kernel_tuner.testing.testing_test_case import TestCase
 
 
 class TestingResult():

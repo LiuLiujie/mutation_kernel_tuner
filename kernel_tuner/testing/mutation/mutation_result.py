@@ -1,5 +1,5 @@
 from kernel_tuner.testing.mutation.mutant import HigherOrderMutant, Mutant
-from kernel_tuner.testing.test_case import TestCase
+from kernel_tuner.testing.testing_test_case import TestCase
 from kernel_tuner.testing.testing_result import TestingResult
 
 

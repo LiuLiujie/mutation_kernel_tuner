@@ -9,7 +9,7 @@ from kernel_tuner.testing.mutation.mutation_analyzer import MutationAnalyzer
 from kernel_tuner.testing.mutation.mutation_exectutor import MutationExecutor
 from kernel_tuner.testing.testing_kernel import TestingKernelBuilder
 from kernel_tuner.testing.mutation.mutation_operator import MutationOperator
-from kernel_tuner.testing.test_case import TestCase
+from kernel_tuner.testing.testing_test_case import TestCase
 from test.context import skip_backend
 backends = ["cuda", "cupy"]
 

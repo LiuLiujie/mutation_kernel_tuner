@@ -3,7 +3,7 @@ from kernel_tuner import run_kernel, tune_kernel, mut_kernel, test_kernel
 import pytest
 from kernel_tuner.testing.mutation.mutant import MutantStatus
 
-from kernel_tuner.testing.test_case import TestCase
+from kernel_tuner.testing.testing_test_case import TestCase
 
 try:
     # CUDA required

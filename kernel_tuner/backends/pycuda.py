@@ -370,6 +370,10 @@ class PyCudaFunctions(GPUBackend):
         """
         drv.memset_d8(allocation, value, size)
 
+    def create_stream(self):
+        """create CUDA stream"""
+        return drv.Stream()
+
     def memcpy_dtoh(self, dest, src):
         """perform a device to host memory copy
 
@@ -383,6 +387,21 @@ class PyCudaFunctions(GPUBackend):
             drv.memcpy_dtoh(dest, src)
         elif isinstance(src, torch.Tensor):
             dest[:] = src
+    
+    def memcpy_htod_async(self, dest, src, stream=None):
+        """perform a host to device async memory copy
+
+        :param dest: A GPU memory allocation unit
+        :type dest: pycuda.driver.DeviceAllocation
+
+        :param src: A numpy array in host memory to store the data
+        :type src: numpy.ndarray
+        """
+        if stream is None:
+            stream = self.stream
+
+        if isinstance(dest, drv.DeviceAllocation):
+            drv.memcpy_htod_async(dest, src, stream)
 
     def memcpy_htod(self, dest, src):
         """perform a host to device memory copy
