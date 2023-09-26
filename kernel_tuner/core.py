@@ -260,6 +260,7 @@ class DeviceInterface(object):
         self.units = dev.units
         self.name = dev.name
         self.max_threads = dev.max_threads
+        self.quiet = quiet
         if not quiet:
             print("Using: " + self.dev.name)
 
@@ -490,7 +491,8 @@ class DeviceInterface(object):
                     print(f"skipping config {util.get_instance_string(instance.params)} reason: too much shared memory used")
             else:
                 logging.debug('compile_kernel failed due to error: ' + str(e))
-                print("Error while compiling:", instance.name)
+                if not self.quiet:
+                    print("Error while compiling:", instance.name)
                 raise e
         return func
 

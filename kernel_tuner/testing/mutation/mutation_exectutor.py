@@ -1,7 +1,132 @@
+from copy import deepcopy
+import multiprocessing
+try:
+    multiprocessing.set_start_method('spawn')
+except RuntimeError:
+   pass
+import os
+import signal
+import threading
+
 from kernel_tuner.testing.mutation.mutant import HigherOrderMutant, Mutant, MutantPosition, MutantStatus
 from kernel_tuner.testing.testing_kernel import TestingKernelBuilder, TimeoutException
 from kernel_tuner.testing.mutation.mutation_result import MutationResult
 from kernel_tuner.testing.testing_test_case import TestCase
+
+def timeout_handler(signum, frame):
+        print("Runner timeout")
+        raise TimeoutException
+
+class MTRunnerKiller(threading.Thread):
+    """A killer to terminate the mutation testing runner"""
+
+    def __init__(self, target_process, repeat_sec=2.0):
+        super(MTRunnerKiller,self).__init__()
+        self.target_process = target_process
+        self.repeat_sec = repeat_sec
+        self.daemon = True
+
+    def run(self):
+        while self.target_process.is_alive():
+            os.kill(self.target_process.pid, signal.SIGKILL)
+            self.target_process.join(self.repeat_sec)
+
+class MTRunner(multiprocessing.Process):
+    """A mutation testing runner
+       When a GPU kernel throws an runtime exception, the runner will be killed to 
+       force the GPU driver to release the corresponding GPU context. 
+    """
+
+    def __init__(self, kernel_builder: TestingKernelBuilder, mutants: list[Mutant or HigherOrderMutant],
+                 test_cases: list[TestCase], result_queue, current_mutant_idx, current_mutant_idx_queue):
+        
+        super().__init__()
+        self.kernel_builder = kernel_builder
+        self.mutants = mutants
+        self.test_cases = test_cases
+        self.result_queue = result_queue
+        self.current_mutant_idx = current_mutant_idx
+        self.current_mutant_idx_queue = current_mutant_idx_queue
+    
+    def run(self):
+        if not len(self.mutants):
+            self.result_queue.put(self.mutants)
+            return
+        self.mutants_runner()
+
+    def mutants_runner(self):
+        kernel = self.kernel_builder.build()
+        for idx, mutant in enumerate(self.mutants):
+            if (idx < self.current_mutant_idx):
+                continue
+            
+            #Start a mutant
+            self.current_mutant_idx = idx
+            mutant.status = MutantStatus.PENDING
+            print("Mutant", mutant.id, "starts")
+            
+            if self.kernel_builder.verbose:
+                print("Mutant", mutant.id, "operator", mutant.operator.name,
+                      "replacement", mutant.operator.replacement,
+                      "from line", mutant.start.line, "column", mutant.start.column,
+                      "to line", mutant.end.line, "column", mutant.end.column)
+                
+            #Mutate the kernel code
+            mutated_kernel_string = self.kernel_builder.kernel_string
+            if isinstance(mutant, Mutant):
+                mutated_kernel_string = MutationExecutor.mutate(mutated_kernel_string, mutant.start,
+                                                                mutant.end, mutant.operator.replacement)
+            elif isinstance(mutant, HigherOrderMutant):
+                for sub_mutant in mutant.mutants:
+                    mutated_kernel_string = MutationExecutor.mutate(mutated_kernel_string, sub_mutant.start,
+                                                                    sub_mutant.end, sub_mutant.operator.replacement)
+            
+            try:
+                kernel.update_kernel(kernel_string = mutated_kernel_string)
+            except:
+                print("Mutant", mutant.id, "contains compilation error(s)")
+                mutant.updateResult(MutantStatus.COMPILE_ERROR)
+                continue
+
+            for test_case in self.test_cases:
+                print("Mutant", mutant.id, "executes with test case", test_case.id)
+                kernel.update_gpu_args(test_case.input)
+                kernel.update_expected_output(test_case.output)
+                try:
+                    result = kernel.execute()
+                    passed, _ = test_case.verify_result(result)
+                    if not passed:
+                        
+                        print("Mutant", mutant.id, "killed by test case:", test_case.id)
+                        mutant.updateResult(MutantStatus.KILLED, test_case.id)
+                except TimeoutException:
+                    print("Mutant", mutant.id, "timeout with test case:", test_case.id)
+                    mutant.updateResult(MutantStatus.TIMEOUT)
+                    break
+                except Exception as e: 
+                    #The subprocess need to return so that the corresponding GPU error context can also be released
+                    print("Mutant", mutant.id, "has runtime error with test case: ", test_case.id)
+                    if kernel.verbose:
+                        print(e)
+                    mutant.updateResult(MutantStatus.RUNTIME_ERROR)
+                    self.result_queue.put(self.mutants)
+                    self.current_mutant_idx_queue.put(self.current_mutant_idx)
+                    return
+
+            # Not killed by any test cases: mutant survived
+            if mutant.status in [MutantStatus.PENDING, MutantStatus.SURVIVED]:
+                print("Mutant", mutant.id, "survived")
+                mutant.updateResult(MutantStatus.SURVIVED)
+        
+        #After testing all the mutants
+        self.result_queue.put(self.mutants)
+        self.current_mutant_idx_queue.put(-1)
+
+    def terminate(self, repeat_sec=2.0):
+        if self.is_alive() is False:
+            return True
+        killer = MTRunnerKiller(self, repeat_sec=repeat_sec)
+        killer.start()
 
 class MutationExecutor():
     def __init__(self, mutation_kernel_builder: TestingKernelBuilder, mutants: list[Mutant], test_cases: list[TestCase],
@@ -11,117 +136,62 @@ class MutationExecutor():
         self.test_cases = test_cases
         self.high_order_mutants = high_order_mutants
     
-    def execute(self) -> MutationResult:
-        self._execute_mutants()
-        
+    def execute(self):
+        kernel_builder = deepcopy(self.kernel_builder)
+        current_mutant_idx = 0
+        result_queue = multiprocessing.Queue()
+        current_mutant_idx_queue = multiprocessing.Queue()
+        while(True):
+            process = MTRunner(kernel_builder, self.mutants, self.test_cases, result_queue,
+                                current_mutant_idx, current_mutant_idx_queue)
+            process.start()
+            try:
+                self.mutants = result_queue.get(timeout=3600)
+                current_mutant_idx = current_mutant_idx_queue.get(timeout=5)
+            except:
+                print("Golbal timeout for fetching results")
+                process.terminate()
+                break
+            process.join(timeout=5)
+            if process.is_alive():
+                print("Golbal timeout")
+                process.terminate()
+                print("Process terminated")
+            
+            if current_mutant_idx != -1:
+                current_mutant_idx += 1
+            else:
+                break
+                
         if len(self.high_order_mutants):
-            self._execute_ho_mutants()
-            return MutationResult(self.mutants, self.test_cases, self.high_order_mutants)
-        
-        return MutationResult(self.mutants, self.test_cases)
-    
-    def _execute_mutants(self) -> None:
-        kernel = self.kernel_builder.build()
-        for mutant in self.mutants:
-            #Ingore the killed and error mutants
-            if (mutant.status in [MutantStatus.KILLED, MutantStatus.PERF_KILLED, MutantStatus.COMPILE_ERROR]):
-                continue
-            
-            #Start a new mutant
-            if (mutant.status == MutantStatus.CREATED):
-                mutant.status = MutantStatus.PENDING
-
-            print("Start running mutant", mutant.id)
-            #Mutate the kernel code
-            original_kernel_string = self.kernel_builder.kernel_string
-            mutated_kernel_string = MutationExecutor.mutate(original_kernel_string, mutant.start, mutant.end, mutant.operator.replacement)
-            try:
-                kernel.update_kernel(kernel_string = mutated_kernel_string)
-            except:
-                print("Mutant", mutant.id, "contains compilation error(s)")
-                mutant.updateResult(MutantStatus.COMPILE_ERROR)
-                continue
-
-            for test_case in self.test_cases:
-                kernel.update_gpu_args(test_case.input)
+            current_mutant_idx = 0
+            while(True):
+                #Must use Manager (shared memory) here because the size of high_order_mutants
+                # is too big for a normal multiprocessing queue and will block the runner process.
+                result_queue = multiprocessing.Manager().Queue()
+                current_mutant_idx_queue = multiprocessing.Manager().Queue()
+                process = MTRunner(kernel_builder, self.high_order_mutants, self.test_cases, result_queue,
+                                    current_mutant_idx, current_mutant_idx_queue)
+                process.start()
                 try:
-                    result = kernel.execute()
-                    if not kernel.verify(result, test_case.output, test_case.verify, test_case.atol):
-                        print("Mutant", mutant.id, "killed by test case: ", test_case.id)
-                        mutant.updateResult(MutantStatus.KILLED, test_case.id)
-                except TimeoutException:
-                    print("Mutant", mutant.id, "timeout with test case: ", test_case.id)
-                    mutant.updateResult(MutantStatus.TIMEOUT)
-                    continue
-                except Exception as e: 
-                    print("Mutant", mutant.id, "has runtime error with test case: ", test_case.id)
-                    print(e)
-                    mutant.updateResult(MutantStatus.RUNTIME_ERROR)
-                    continue
-    
-            # Not killed by any test cases: mutant survived
-            if mutant.status == MutantStatus.PENDING:
-                print("Mutant", mutant.id, "survived")
-                mutant.updateResult(MutantStatus.SURVIVED)
-
-    def _execute_ho_mutants(self) -> None:
-        kernel = self.kernel_builder.build()
-        for ho_mutant in self.high_order_mutants:
-            #Ingore the killed and error mutants
-            if (ho_mutant.status in [MutantStatus.KILLED, MutantStatus.PERF_KILLED, MutantStatus.COMPILE_ERROR]):
-                continue
-
-            #Start a new mutant
-            if (ho_mutant.status == MutantStatus.CREATED):
-                #If the mutant contains compile error, then the ho_mutant will also have
-                skip_ho_mutant = False
-                for mutant in ho_mutant.mutants:
-                    if (mutant.status == MutantStatus.COMPILE_ERROR):
-                        print("Skip high order mutant", ho_mutant.id, "because it contains error or timeout mutant(s)")
-                        skip_ho_mutant = True
-                        break
+                    self.high_order_mutants = result_queue.get(timeout=3600)
+                    current_mutant_idx = current_mutant_idx_queue.get(timeout=5)
+                except:
+                    print("Golbal timeout for fetching results")
+                    process.terminate()
+                    break
+                process.join(timeout=5)
+                if process.is_alive():
+                    print("Golbal timeout")
+                    process.terminate()
+                    print("Process terminated")
                 
-                if skip_ho_mutant:
-                    ho_mutant.updateResult(MutantStatus.COMPILE_ERROR)
-                    continue
+                if current_mutant_idx != -1:
+                    current_mutant_idx += 1
                 else:
-                    ho_mutant.status = MutantStatus.PENDING
-
-            print("Start running higher order mutant", ho_mutant.id)
-            #Mutate the kenel code
-            mutated_kernel_string = self.kernel_builder.kernel_string
-            for mutant in ho_mutant.mutants:
-                mutated_kernel_string = MutationExecutor.mutate(mutated_kernel_string, mutant.start, mutant.end, mutant.operator.replacement)
-            
-            try:
-                kernel.update_kernel(kernel_string=mutated_kernel_string)
-            except:
-                print("Mutant", mutant.id, "contains compilation error(s)")
-                ho_mutant.updateResult(MutantStatus.COMPILE_ERROR)
-                continue
-            for test_case in self.test_cases:
-                kernel.update_gpu_args(test_case.input)
-                try:
-                    result = kernel.execute()
-                    if not kernel.verify(result, test_case.output, test_case.verify, test_case.atol):
-                        #Killed
-                        print("Higher Order Mutant", ho_mutant.id, "killed by test case: ", test_case.id)
-                        ho_mutant.updateResult(MutantStatus.KILLED, test_case.id)
-                except TimeoutException:
-                    print("Higher order mutant", ho_mutant.id, "timeout with test case: ", test_case.id)
-                    mutant.updateResult(MutantStatus.TIMEOUT)
-                    continue
-                except Exception as e:
-                    print("Higher order mutant", ho_mutant.id, "has runtime error with test case: ", test_case.id)
-                    print(e)
-                    mutant.updateResult(MutantStatus.RUNTIME_ERROR)
-                    continue
-
-            # Not killed by any test cases: mutant survived
-            if ho_mutant.status == MutantStatus.PENDING:
-                ho_mutant.updateResult(MutantStatus.SURVIVED)
-                
-    
+                    break
+                    
+        return self.mutants, self.high_order_mutants
 
     def mutate(kernel_string: str, start: MutantPosition, end: MutantPosition, replacement: str) -> str:
         string_lines = kernel_string.splitlines()

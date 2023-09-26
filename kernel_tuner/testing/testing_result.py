@@ -20,11 +20,11 @@ class TestingResult():
             tune_res = self.tune_meta
             tune_res["data"] = self.tune_data
             return tune_res + {
-                "test_cases":[test_case.toJSON() for test_case in self.test_cases]
+                "test_cases":[test_case.toJSON(without_input_output=True) for test_case in self.test_cases]
             }
         else:
             return {
-                "test_cases":[test_case.toJSON() for test_case in self.test_cases]
+                "test_cases":[test_case.toJSON(without_input_output=True) for test_case in self.test_cases]
             }
     
     def exportJSONStr(self) -> str:

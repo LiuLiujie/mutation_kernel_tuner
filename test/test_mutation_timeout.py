@@ -36,7 +36,7 @@ def test_deadloop():
     test_params["block_size_x"] = 1
 
     test_cases = []
-    flag = np.array([False]).astype(np.uint8)
+    flag = np.array([False]).astype(bool)
     input = [flag]
     output = [None]
     test_cases.append(TestCase(id=0, input=input, output = output, problem_size = 1))

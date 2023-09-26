@@ -4,6 +4,7 @@ import json
 
 from kernel_tuner import core
 from kernel_tuner.testing.mutation.mutation_analyzer import MutationAnalyzer
+from kernel_tuner.testing.mutation.mutation_exectutor import MutationExecutor
 from kernel_tuner.testing.mutation.mutation_operator import *
 from test.context import skip_backend
 backends = ["cuda", "cupy"]
@@ -142,6 +143,14 @@ def test_gpu_index_replacement(test_kernel, backend):
     analyzer = MutationAnalyzer(kernel_source, gpu_index_replacement)
     mutants = analyzer.analyze()
     assert len(mutants) == 2
+    mut_string_1 = MutationExecutor.mutate(kernel_string, mutants[0].start,
+                             mutants[0].end, mutants[0].operator.replacement)
+    ref_mut_kernel_1 = kernel_string.replace("blockIdx.x", "threadIdx.x")
+    assert mut_string_1 == ref_mut_kernel_1
+    mut_string_2 = MutationExecutor.mutate(kernel_string, mutants[1].start,
+                             mutants[1].end, mutants[1].operator.replacement)
+    ref_mut_kernel_2 = kernel_string.replace("threadIdx.x", "blockIdx.x")
+    assert mut_string_2 == ref_mut_kernel_2
 
 @pytest.mark.parametrize("backend", backends)
 def test_gpu_index_increment(test_kernel, backend):

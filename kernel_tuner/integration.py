@@ -177,7 +177,10 @@ def create_results(kernel_name, kernel_string, tune_params, problem_size, result
     problem_size_str = "x".join(str(i) for i in problem_size)
 
     #replace all non alphanumeric characters with underscore
-    dev_name = re.sub('[^0-9a-zA-Z]+', '_', env["device_name"].strip())
+    try:
+        dev_name = re.sub('[^0-9a-zA-Z]+', '_', env["device_name"].strip())
+    except:
+        dev_name = "Unknown device"
 
     #remove existing entries for this GPU and problem_size combination from the results if any
     data = [d for d in data if not (d["device_name"] == dev_name and d["problem_size"] == problem_size_str)]

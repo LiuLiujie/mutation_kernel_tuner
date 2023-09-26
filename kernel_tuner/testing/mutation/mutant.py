@@ -9,17 +9,17 @@ class MutantStatus(Enum):
     #When first run starts
     PENDING = 'Pending'
     
-    #After at least one test, no longer run for following tests
+    #After at least one test
     KILLED = 'killed'
     PERF_KILLED = 'KilledByPerf'
     COMPILE_ERROR = 'CompileError'
+    TIMEOUT = 'Timeout'             
+    RUNTIME_ERROR = 'RuntimeError'  
 
-    #Intermedia state for a single test run, will change after all tests
-    TIMEOUT = 'Timeout'             # to KILLED
-    RUNTIME_ERROR = 'RuntimeError'  # to KILLED
-    NO_COVERAGE = 'NoCoverage'      # to SURVIVED
+    #After all tests
+    NO_COVERAGE = 'NoCoverage'
 
-    #All tests survive
+    #All tests passed
     SURVIVED = 'Survived'
 
     #Unknown error

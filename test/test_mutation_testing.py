@@ -74,14 +74,10 @@ def test_executor_execute(test_kernel, backend):
     test_case = TestCase(0, args, expected_output, n)
 
     executor = MutationExecutor(builder, mutants, [test_case])
-    mutation_result = executor.execute()
+    mutants, _ = executor.execute()
 
-    for mutant in mutation_result.mutants:
+    for mutant in mutants:
         assert mutant.status == MutantStatus.KILLED
-
-    js = mutation_result.exportJSONStr()
-    with open("examples/mutation/mutation_testing_result.json", "w") as fo:
-        fo.write(js)
 
 @pytest.mark.parametrize("backend", backends)
 def test_ho_executor_execute(test_kernel, backend):
@@ -103,14 +99,10 @@ def test_ho_executor_execute(test_kernel, backend):
                                     mutation_order = mutation_order) for comb_mutants in comb_mutants_list]
 
     executor = MutationExecutor(builder, mutants, [test_case], ho_mutants)
-    mutation_result = executor.execute()
+    mutants, ho_mutants = executor.execute()
 
-    for mutant in mutation_result.mutants:
+    for mutant in mutants:
         assert mutant.status == MutantStatus.KILLED
 
-    for ho_mutant in mutation_result.higher_order_mutants:
+    for ho_mutant in ho_mutants:
         assert ho_mutant.status == MutantStatus.KILLED
-
-    js = mutation_result.exportJSONStr()
-    with open("examples/mutation/high_order_mutation_testing_result.json", "w") as fo:
-        fo.write(js)

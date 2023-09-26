@@ -16,8 +16,9 @@ class MutationOperator():
         return MutationOperator(self.name, self.find, replacement, self.ignores, self.backends, self.tags)
 
 def loadAllOperators(name: str = None, tags: list[str] = []) -> list[MutationOperator]:
-    #TODO: load all operators
-    return loadAllTraditionalOperators(name, tags)
+    operators = loadAllTraditionalOperators(name, tags)
+    operators += loadAllGPUNativeOperators(name, tags)
+    return operators
 
 def loadAllTraditionalOperators(name: str = None, tags: list[str] = []) -> list[MutationOperator]:
     return conditional_boundary_replacement \
@@ -63,8 +64,8 @@ conditional_operator_replacement = [
 math_replacement_operators = [
     MutationOperator('math_replacement', "+", "-", ignores=["++", "+="]),
     MutationOperator('math_replacement', "-", "+", ignores=["--", "-="]),
-    MutationOperator('math_replacement', "*", "/", ignores=["*="]),
-    MutationOperator('math_replacement', "/", "*", ignores=["/="]),
+    MutationOperator('math_replacement', "*", "/", ignores=["*=","/*","*/","/**","**/"]),
+    MutationOperator('math_replacement', "/", "*", ignores=["/=","//","/*","*/","/**","**/"]),
     MutationOperator('math_replacement', "%", "*", ignores=["&="]),
     MutationOperator('math_replacement', "&", "|", ignores=["&&"]),
     MutationOperator('math_replacement', "|", "&", ignores=["||", "|="]),
@@ -85,7 +86,7 @@ negate_conditional_replacement = [
     MutationOperator('negate_conditional_replacement', "<", ">=", ignores=["<<","<<<"]),
     MutationOperator('negate_conditional_replacement', ">", "<=", ignores=[">>",">>>"]),
     MutationOperator('negate_conditional_replacement', "<=", ">"),
-    MutationOperator('negate_conditional_replacement', ">=", ">"),
+    MutationOperator('negate_conditional_replacement', ">=", "<"),
     MutationOperator('negate_conditional_replacement', "==", "!="),
     MutationOperator('negate_conditional_replacement', "!=", "==")
 ]
@@ -241,8 +242,22 @@ atom_removal = [
 ]
 
 gpu_index_replacement = [
+    #Block <-> thread
     MutationOperator('gpu_index_replacement', "blockIdx.x", "threadIdx.x"),
-    MutationOperator('gpu_index_replacement', "threadIdx.x;", "blockIdx.x;")
+    MutationOperator('gpu_index_replacement', "threadIdx.x;", "blockIdx.x;"),
+    MutationOperator('gpu_index_replacement', "blockIdx.y", "threadIdx.y"),
+    MutationOperator('gpu_index_replacement', "threadIdx.y;", "blockIdx.y;"),
+    MutationOperator('gpu_index_replacement', "blockIdx.z", "threadIdx.z"),
+    MutationOperator('gpu_index_replacement', "threadIdx.z;", "blockIdx.z;"),
+    #x <-> y
+    MutationOperator('gpu_index_replacement', "threadIdx.x;", "threadIdx.y;"),
+    MutationOperator('gpu_index_replacement', "blockIdx.x", "blockIdx.y"),
+    MutationOperator('gpu_index_replacement', "gridDim.x;", "gridDim.y;"),
+    MutationOperator('gpu_index_replacement', "blockDim.x;", "blockDim.y;"),
+    MutationOperator('gpu_index_replacement', "threadIdx.y;", "threadIdx.x;"),
+    MutationOperator('gpu_index_replacement', "blockIdx.y", "blockIdx.x"),
+    MutationOperator('gpu_index_replacement', "gridDim.y", "gridDim.x"),
+    MutationOperator('gpu_index_replacement', "blockDim.y", "blockDim.x"),
 ]
 
 gpu_index_increment = [

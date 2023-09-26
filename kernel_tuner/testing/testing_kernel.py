@@ -8,6 +8,9 @@ from kernel_tuner.integration import TuneResults
 class TimeoutException(Exception):
     pass
 
+class RuntimeException(Exception):
+    pass
+
 class TestingKernel():
     def __init__(self, kernel_name, kernel_string, params, arguments, expected_output, kernel_options, verbose,
                 device=0, lang=None, timeout_seconds = -1):
@@ -32,12 +35,16 @@ class TestingKernel():
         self.update_gpu_args(self.arguments)
     
     def update_gpu_args(self, args) -> None:
-        self.arguments = args
-        for i, arg in enumerate(args):
-            if isinstance(args[i], np.ndarray):
-                self.dev_inf.dev.memcpy_htod(self.gpu_args[i], arg)
-            else:
-                self.gpu_args[i] = arg
+        self.gpu_args = self.dev_inf.ready_argument_list(args)
+        #self.arguments = args
+        #for i, arg in enumerate(args):
+        #    if isinstance(args[i], np.ndarray):
+        #        self.dev_inf.dev.memcpy_htod(self.gpu_args[i], arg)
+        #    else:
+        #        self.gpu_args[i] = arg
+    
+    def update_expected_output(self, expected_output) -> None:
+        self.expected_output = expected_output
 
     def update_kernel(self, kernel_string) -> None:
         self.kernel_string = kernel_string
@@ -63,22 +70,22 @@ class TestingKernel():
                 res = np.zeros_like(self.expected_output[i])
                 self.dev_inf.memcpy_dtoh(res, self.gpu_args[i])
                 results.append(res)
-        return results
-
-    def verify(self, result, expected_output, verify, atol) -> bool:
-        try:
-            if verify:
-                return verify(expected_output, result, atol)
             else:
-                return core._default_verify_function(self.kernel_instance, expected_output, result, atol, self.verbose)
-        except:
-            return False
+                results.append(None)
+        return results
             
     def execute(self) -> list:
         if self.timeout_seconds > 0:
             return self.__execute_timeout_enabled()
         else:
-            self.dev_inf.run_kernel(self.func, self.gpu_args, self.kernel_instance)
+            if self.lang.upper() == "C":
+                #C kernel will use -1.0 as dead context
+                result = self.dev_inf.dev.run_kernel(self.func, self.gpu_args,
+                                                      self.kernel_instance.threads, self.kernel_instance.grid)
+                if result < 0:
+                    raise RuntimeException("The GPU contenxt for C is dead")
+            else:
+                self.dev_inf.run_kernel(self.func, self.gpu_args, self.kernel_instance)
             result = self.__get_gpu_result()
             self.__reset_gpu_result()
             return result
@@ -100,6 +107,7 @@ class TestingKernel():
                 is_interrupted = True
 
         if is_interrupted:
+            self.__reset_gpu_result()
             raise TimeoutException
         
         result = self.__get_gpu_result()
@@ -124,14 +132,19 @@ class TestingKernelBuilder():
         self.device=0
         self.platform=0
         self.block_size_names=None
-        self.verbose=True
+        self.verbose=False
         self.lang=None
         self.timeout_seconds = -1
+        self.global_timeout_second = 30
     
     def add_grid_div(self, grid_div_x=None, grid_div_y=None, grid_div_z=None):
         self.grid_div_x = grid_div_x
         self.grid_div_y = grid_div_y
         self.grid_div_z = grid_div_z
+        return self
+    
+    def add_lang(self, lang=None):
+        self.lang = lang
         return self
     
     def add_restriction(self, restrictions):
@@ -140,6 +153,10 @@ class TestingKernelBuilder():
     
     def enable_testing_timeout(self, tiemout_seconds):
         self.timeout_seconds = tiemout_seconds
+        return self
+    
+    def enable_verbose(self, verbose):
+        self.verbose = verbose
         return self
 
     def init_by_tune_result(results_file: TuneResults, arguments, expected_output):
