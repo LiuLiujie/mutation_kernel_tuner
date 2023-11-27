@@ -38,7 +38,7 @@ class MTRunner(multiprocessing.Process):
     """
 
     def __init__(self, kernel_builder: TestingKernelBuilder, mutants: list[Mutant or HigherOrderMutant],
-                 test_cases: list[TestCase], result_queue, current_mutant_idx, current_mutant_idx_queue):
+                 test_cases: list[TestCase], result_queue, current_mutant_idx):
         
         super().__init__()
         self.kernel_builder = kernel_builder
@@ -46,7 +46,6 @@ class MTRunner(multiprocessing.Process):
         self.test_cases = test_cases
         self.result_queue = result_queue
         self.current_mutant_idx = current_mutant_idx
-        self.current_mutant_idx_queue = current_mutant_idx_queue
     
     def run(self):
         if not len(self.mutants):
@@ -72,7 +71,7 @@ class MTRunner(multiprocessing.Process):
                       "to line", mutant.end.line, "column", mutant.end.column)
                 
             #Mutate the kernel code
-            mutated_kernel_string = self.kernel_builder.kernel_string
+            mutated_kernel_string = deepcopy(self.kernel_builder.kernel_string)
             if isinstance(mutant, Mutant):
                 mutated_kernel_string = MutationExecutor.mutate(mutated_kernel_string, mutant.start,
                                                                 mutant.end, mutant.operator.replacement)
@@ -86,7 +85,8 @@ class MTRunner(multiprocessing.Process):
             except:
                 print("Mutant", mutant.id, "contains compilation error(s)")
                 mutant.updateResult(MutantStatus.COMPILE_ERROR)
-                continue
+                self.result_queue.put(mutant)
+                break
 
             for test_case in self.test_cases:
                 print("Mutant", mutant.id, "executes with test case", test_case.id)
@@ -96,7 +96,6 @@ class MTRunner(multiprocessing.Process):
                     result = kernel.execute()
                     passed, _ = test_case.verify_result(result)
                     if not passed:
-                        
                         print("Mutant", mutant.id, "killed by test case:", test_case.id)
                         mutant.updateResult(MutantStatus.KILLED, test_case.id)
                 except TimeoutException:
@@ -109,18 +108,14 @@ class MTRunner(multiprocessing.Process):
                     if kernel.verbose:
                         print(e)
                     mutant.updateResult(MutantStatus.RUNTIME_ERROR)
-                    self.result_queue.put(self.mutants)
-                    self.current_mutant_idx_queue.put(self.current_mutant_idx)
+                    self.result_queue.put(mutant)
                     return
 
             # Not killed by any test cases: mutant survived
             if mutant.status in [MutantStatus.PENDING, MutantStatus.SURVIVED]:
                 print("Mutant", mutant.id, "survived")
                 mutant.updateResult(MutantStatus.SURVIVED)
-        
-        #After testing all the mutants
-        self.result_queue.put(self.mutants)
-        self.current_mutant_idx_queue.put(-1)
+            self.result_queue.put(mutant)
 
     def terminate(self, repeat_sec=2.0):
         if self.is_alive() is False:
@@ -135,47 +130,55 @@ class MutationExecutor():
         self.kernel_builder = mutation_kernel_builder
         self.test_cases = test_cases
         self.high_order_mutants = high_order_mutants
+        self.golbal_timeout = mutation_kernel_builder.global_timeout_second
     
     def execute(self):
+        
         kernel_builder = deepcopy(self.kernel_builder)
         current_mutant_idx = 0
-        result_queue = multiprocessing.Queue()
-        current_mutant_idx_queue = multiprocessing.Queue()
-        while(True):
+        total_mutant = len(self.mutants)
+        print("Total mutants:", total_mutant)
+        results = []
+        result_queue = multiprocessing.Manager().Queue()
+
+        while(current_mutant_idx < total_mutant):
             process = MTRunner(kernel_builder, self.mutants, self.test_cases, result_queue,
-                                current_mutant_idx, current_mutant_idx_queue)
+                                current_mutant_idx)
             process.start()
             try:
-                self.mutants = result_queue.get(timeout=3600)
-                current_mutant_idx = current_mutant_idx_queue.get(timeout=5)
+                while(current_mutant_idx < total_mutant):
+                    result = result_queue.get(timeout=self.golbal_timeout)
+                    results.append(result)
+                    print("Finish getting results from:", result.id, "with mutant index", current_mutant_idx)
+                    current_mutant_idx+=1
+                    if result.status in [MutantStatus.RUNTIME_ERROR, MutantStatus.COMPILE_ERROR]:
+                        print("Restarting the mutant runner")
+                        break
             except:
-                print("Golbal timeout for fetching results")
+                print("Global timeout for mutant:", current_mutant_idx)
+                #TODO: mark mutant timeout
                 process.terminate()
-                break
-            process.join(timeout=5)
+                current_mutant_idx += 1
+            process.join(timeout=self.golbal_timeout)
             if process.is_alive():
-                print("Golbal timeout")
+                print("Golbal timeout for mutant runner")
                 process.terminate()
                 print("Process terminated")
-            
-            if current_mutant_idx != -1:
-                current_mutant_idx += 1
-            else:
-                break
+        
+        self.mutants = results
                 
         if len(self.high_order_mutants):
+            print("Total HO mutants:", len(self.high_order_mutants))
             current_mutant_idx = 0
             while(True):
                 #Must use Manager (shared memory) here because the size of high_order_mutants
                 # is too big for a normal multiprocessing queue and will block the runner process.
                 result_queue = multiprocessing.Manager().Queue()
-                current_mutant_idx_queue = multiprocessing.Manager().Queue()
                 process = MTRunner(kernel_builder, self.high_order_mutants, self.test_cases, result_queue,
-                                    current_mutant_idx, current_mutant_idx_queue)
+                                    current_mutant_idx)
                 process.start()
                 try:
                     self.high_order_mutants = result_queue.get(timeout=3600)
-                    current_mutant_idx = current_mutant_idx_queue.get(timeout=5)
                 except:
                     print("Golbal timeout for fetching results")
                     process.terminate()

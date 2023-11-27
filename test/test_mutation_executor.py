@@ -25,6 +25,7 @@ def test_kernel():
         __syncthreads();
         atomicAdd(&a[i], 1);
         vector_add<<<1024, 256>>>();
+        cudaDeviceSynchronize();
     }
     """
     n = np.int32(100)
@@ -57,6 +58,7 @@ def test_allocation_swap(test_kernel, backend):
         __syncthreads();
         atomicAdd(&a[i], 1);
         vector_add<<< 256,1024>>>();
+        cudaDeviceSynchronize();
     }
     """
 
@@ -85,6 +87,7 @@ def test_allocation_increase(test_kernel, backend):
         __syncthreads();
         atomicAdd(&a[i], 1);
         vector_add<<<1024+1, 256>>>();
+        cudaDeviceSynchronize();
     }
     """
     mut2 = MutationExecutor.mutate(kernel_string, mutants[1].start, mutants[1].end, mutants[1].operator.replacement)
@@ -103,6 +106,7 @@ def test_allocation_increase(test_kernel, backend):
         __syncthreads();
         atomicAdd(&a[i], 1);
         vector_add<<<1024, 256+1>>>();
+        cudaDeviceSynchronize();
     }
     """
 
@@ -131,6 +135,7 @@ def test_allocation_decrease(test_kernel, backend):
         __syncthreads();
         atomicAdd(&a[i], 1);
         vector_add<<<1024-1, 256>>>();
+        cudaDeviceSynchronize();
     }
     """
     mut2 = MutationExecutor.mutate(kernel_string, mutants[1].start, mutants[1].end, mutants[1].operator.replacement)
@@ -149,6 +154,7 @@ def test_allocation_decrease(test_kernel, backend):
         __syncthreads();
         atomicAdd(&a[i], 1);
         vector_add<<<1024, 256-1>>>();
+        cudaDeviceSynchronize();
     }
     """
         
@@ -177,5 +183,36 @@ def test_atomic_add_sub_removal(test_kernel, backend):
         __syncthreads();
         a[i]+= 1;
         vector_add<<<1024, 256>>>();
+        cudaDeviceSynchronize();
+    }
+    """
+
+@pytest.mark.parametrize("backend", backends)
+def test_sync_child_removal(test_kernel, backend):
+    skip_backend(backend)
+    kernel_name, kernel_string, n, args, expected_output, params = test_kernel
+
+    kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
+    analyzer = MutationAnalyzer(kernel_source, sync_child_removal)
+    mutants = analyzer.analyze()
+    assert len(mutants) == 1
+    mut1 = MutationExecutor.mutate(kernel_string, mutants[0].start, mutants[0].end, mutants[0].operator.replacement)
+    print(mut1)
+    assert mut1 == """
+    __global__ void vector_add(float *c, float *a, float *b, int n) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i<n && i!=n) {
+            c[i] = a[i] + b[i];
+            c[i]++;
+            c[i]--;
+            c[i] += a[i];
+            c[i] -= a[i];
+            c[i] *= a[i];
+            c[i] /= a[i];
+        }
+        __syncthreads();
+        atomicAdd(&a[i], 1);
+        vector_add<<<1024, 256>>>();
+        //cudaDeviceSynchronize();
     }
     """

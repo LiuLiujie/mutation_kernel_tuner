@@ -26,6 +26,7 @@ def test_kernel():
         __syncthreads();
         atomicAdd(&a[i], 1);
         vector_add<<<1024, 256>>>();
+        cudaDeviceSynchronize();
     }
     """
     n = np.int32(100)
@@ -179,5 +180,16 @@ def test_sync_removal(test_kernel, backend):
 
     kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
     analyzer = MutationAnalyzer(kernel_source, sync_removal)
+    mutants = analyzer.analyze()
+    assert len(mutants) == 1
+
+
+@pytest.mark.parametrize("backend", backends)
+def test_sync_child_removal(test_kernel, backend):
+    skip_backend(backend)
+    kernel_name, kernel_string, n, args, expected_output, params = test_kernel
+
+    kernel_source = core.KernelSource(kernel_name, kernel_string, lang=backend)
+    analyzer = MutationAnalyzer(kernel_source, sync_child_removal)
     mutants = analyzer.analyze()
     assert len(mutants) == 1
